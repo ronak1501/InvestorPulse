@@ -176,7 +176,7 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
 
                                                 {alert.call_insight && (
                                                     <div className="mt-3 bg-white/60 p-3 rounded-xl border border-slate-200/50 text-slate-600 italic">
-                                                        "{alert.call_insight}"
+                                                        &quot;{alert.call_insight}&quot;
                                                     </div>
                                                 )}
                                             </div>
