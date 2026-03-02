@@ -4,7 +4,7 @@ import { Phone, MapPin, Calendar, TrendingUp, AlertCircle, ArrowLeft, ArrowUpRig
 import Link from 'next/link';
 import InvestorChart from '@/components/InvestorChart';
 
-export default async function InvestorDetailPage({ params }: { params: { id: string } }) {
+export default async function InvestorDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const supabase = await createClient();
 
     const { id } = await params;
