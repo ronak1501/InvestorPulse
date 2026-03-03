@@ -1,3 +1,4 @@
+import React from 'react';
 import { createClient } from '@/utils/supabase/server';
 import Link from 'next/link';
 import { ShieldAlert, AlertTriangle, ArrowUpRight, Ban, TrendingDown } from 'lucide-react';
@@ -68,8 +69,8 @@ export default async function PanicRiskPage() {
                                 {alerts.map((alert: any) => {
                                     const investor = alert.investor || {};
                                     return (
-                                        <>
-                                            <tr key={alert.id} className="group hover:bg-slate-50/80 transition-colors">
+                                        <React.Fragment key={alert.id}>
+                                            <tr className="group hover:bg-slate-50/80 transition-colors">
                                                 <td className="px-8 py-5">
                                                     <div className="flex items-center gap-4">
                                                         <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-500 to-orange-500 text-white flex items-center justify-center font-bold shadow-inner">
@@ -126,7 +127,7 @@ export default async function PanicRiskPage() {
                                                     </td>
                                                 </tr>
                                             )}
-                                        </>
+                                        </React.Fragment>
                                     );
                                 })}
                             </tbody>

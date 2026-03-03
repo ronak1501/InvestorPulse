@@ -54,7 +54,9 @@ export default async function DashboardPage() {
         }
     }
 
-    // Fund Performance calculation from real synced MFAPI data
+    // Fund Performance: try synced market data first, fallback to monthly_investments
+    const DUMMY_FUNDS = ['Tech Opportunities', 'Infrastructure Theme', 'Midcap Momentum', 'Liquid Cash Plus', 'Flexi Cap Alpha', 'Small Cap Discover', 'Banking & PSU', 'Bluechip Equity'];
+
     const { data: allFunds } = await supabase
         .from('fund_performance')
         .select(`
@@ -65,17 +67,44 @@ export default async function DashboardPage() {
         `)
         .order('return_1y', { ascending: false });
 
-    // Ensure array structure and filter unwanted funds + restrict to user's portfolio
-    const DUMMY_FUNDS = ['Tech Opportunities', 'Infrastructure Theme', 'Midcap Momentum', 'Liquid Cash Plus', 'Flexi Cap Alpha', 'Small Cap Discover', 'Banking & PSU', 'Bluechip Equity'];
-
-    const fundsPerformance = (allFunds || []).filter(f => {
+    const syncedFunds = (allFunds || []).filter(f => {
         const name = f.fund_schemes?.scheme_name;
         if (!name) return false;
         if (DUMMY_FUNDS.some(dummy => name.includes(dummy) || dummy.includes(name))) return false;
-
-        // Show real funds from market sync, prioritizing ones user holds if we want, but letting all valid ones show.
         return true;
-    }).slice(0, 10); // Show top 10
+    }).slice(0, 10);
+
+    // Fallback: aggregate from monthly_investments if no synced data
+    let fundsPerformance: any[] = syncedFunds;
+    if (syncedFunds.length === 0 && user?.id) {
+        const { data: investData } = await supabase
+            .from('monthly_investments')
+            .select('fund_name, current_value, nav, investor_id')
+            .eq('user_id', user.id);
+
+        if (investData && investData.length > 0) {
+            const fundMap: Record<string, { fund_name: string; navs: number[]; count: number; total_value: number }> = {};
+            for (const inv of investData) {
+                if (!inv.fund_name) continue;
+                if (DUMMY_FUNDS.some(d => inv.fund_name.includes(d) || d.includes(inv.fund_name))) continue;
+                if (!fundMap[inv.fund_name]) {
+                    fundMap[inv.fund_name] = { fund_name: inv.fund_name, navs: [], count: 0, total_value: 0 };
+                }
+                if (inv.nav) fundMap[inv.fund_name].navs.push(Number(inv.nav));
+                fundMap[inv.fund_name].count += 1;
+                fundMap[inv.fund_name].total_value += Number(inv.current_value || 0);
+            }
+            fundsPerformance = Object.values(fundMap).map(f => ({
+                _isFallback: true,
+                fund_schemes: { scheme_name: f.fund_name },
+                latest_nav: f.navs.length > 0 ? (f.navs.reduce((a, b) => a + b, 0) / f.navs.length).toFixed(2) : null,
+                investor_count: f.count,
+                total_value: f.total_value,
+                return_1y: null,
+                return_3y: null,
+            })).slice(0, 10);
+        }
+    }
 
     return (
         <div className="p-8 lg:p-10 max-w-7xl mx-auto space-y-8">
@@ -162,35 +191,57 @@ export default async function DashboardPage() {
                                         <tr className="bg-slate-50/50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-100">
                                             <th className="px-6 py-4 font-semibold">Fund Name</th>
                                             <th className="px-6 py-4 font-semibold text-right">NAV</th>
-                                            <th className="px-6 py-4 font-semibold text-right">1Y</th>
-                                            <th className="px-6 py-4 font-semibold text-right">3Y</th>
+                                            {fundsPerformance[0]?._isFallback
+                                                ? <th className="px-6 py-4 font-semibold text-right">Investors</th>
+                                                : <th className="px-6 py-4 font-semibold text-right">1Y Return</th>}
+                                            {fundsPerformance[0]?._isFallback
+                                                ? <th className="px-6 py-4 font-semibold text-right">AUM (₹)</th>
+                                                : <th className="px-6 py-4 font-semibold text-right">3Y Return</th>}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 text-sm">
-                                        {fundsPerformance.map((fund: any) => (
-                                            <tr key={fund.scheme_code} className="hover:bg-slate-50/50 transition-colors">
-                                                <td className="px-6 py-4 font-medium text-slate-900">{fund.fund_schemes?.scheme_name || 'Unnamed Fund'}</td>
-                                                <td className="px-6 py-4 text-slate-600 text-right">{fund.latest_nav ? `₹${fund.latest_nav}` : '--'}</td>
-                                                <td className="px-6 py-4 text-right">
-                                                    {fund.return_1y !== undefined && fund.return_1y !== null ? (
-                                                        <span className={fund.return_1y < 0 ? 'text-rose-600 font-medium' : 'text-emerald-600 font-medium'}>
-                                                            {fund.return_1y > 0 ? '+' : ''}{fund.return_1y}%
-                                                        </span>
-                                                    ) : <span className="text-slate-400">--</span>}
+                                        {fundsPerformance.map((fund: any, idx: number) => (
+                                            <tr key={fund.scheme_code || fund.fund_schemes?.scheme_name || idx} className="hover:bg-slate-50/50 transition-colors">
+                                                <td className="px-6 py-4 font-medium text-slate-900 max-w-[260px]">
+                                                    <span className="line-clamp-2">{fund.fund_schemes?.scheme_name || 'Unnamed Fund'}</span>
                                                 </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    {fund.return_3y !== undefined && fund.return_3y !== null ? (
-                                                        <span className={fund.return_3y < 0 ? 'text-rose-600 font-medium' : 'text-emerald-600 font-medium'}>
-                                                            {fund.return_3y > 0 ? '+' : ''}{fund.return_3y}%
-                                                        </span>
-                                                    ) : <span className="text-slate-400">--</span>}
+                                                <td className="px-6 py-4 text-slate-600 text-right">
+                                                    {fund.latest_nav ? `₹${Number(fund.latest_nav).toFixed(2)}` : '--'}
                                                 </td>
+                                                {fund._isFallback ? (
+                                                    <>
+                                                        <td className="px-6 py-4 text-right font-semibold text-slate-700">{fund.investor_count}</td>
+                                                        <td className="px-6 py-4 text-right text-slate-600">
+                                                            {fund.total_value > 0 ? `₹${(fund.total_value / 100000).toFixed(1)}L` : '--'}
+                                                        </td>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <td className="px-6 py-4 text-right">
+                                                            {fund.return_1y !== null && fund.return_1y !== undefined ? (
+                                                                <span className={Number(fund.return_1y) < 0 ? 'text-rose-600 font-medium' : 'text-emerald-600 font-medium'}>
+                                                                    {Number(fund.return_1y) > 0 ? '+' : ''}{Number(fund.return_1y).toFixed(2)}%
+                                                                </span>
+                                                            ) : <span className="text-slate-400">--</span>}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right">
+                                                            {fund.return_3y !== null && fund.return_3y !== undefined ? (
+                                                                <span className={Number(fund.return_3y) < 0 ? 'text-rose-600 font-medium' : 'text-emerald-600 font-medium'}>
+                                                                    {Number(fund.return_3y) > 0 ? '+' : ''}{Number(fund.return_3y).toFixed(2)}%
+                                                                </span>
+                                                            ) : <span className="text-slate-400">--</span>}
+                                                        </td>
+                                                    </>
+                                                )}
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
                             ) : (
-                                <div className="p-12 text-center text-slate-500 text-sm">No fund performance data available.</div>
+                                <div className="p-12 text-center">
+                                    <p className="text-slate-500 text-sm font-medium">No fund data available.</p>
+                                    <p className="text-slate-400 text-xs mt-1">Upload investor data or sync market data to get started.</p>
+                                </div>
                             )}
                         </div>
                     </div>

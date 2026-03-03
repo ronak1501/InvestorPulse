@@ -1,17 +1,27 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useRef } from 'react'
 import Link from 'next/link'
 import { loginAction } from './actions'
-import { ShieldCheck, ArrowRight, BarChart3, PieChart } from 'lucide-react'
+import { ShieldCheck, ArrowRight, BarChart3, PieChart, Zap } from 'lucide-react'
 
 const initialState = {
     error: null as string | null,
     message: null as string | null
 }
 
+const DEMO_EMAIL = 'test@demo.com'
+const DEMO_PASSWORD = 'password123'
+
 export default function LoginPage() {
     const [state, formAction, pending] = useActionState(loginAction, initialState)
+    const emailRef = useRef<HTMLInputElement>(null)
+    const passwordRef = useRef<HTMLInputElement>(null)
+
+    const fillDemoCredentials = () => {
+        if (emailRef.current) emailRef.current.value = DEMO_EMAIL
+        if (passwordRef.current) passwordRef.current.value = DEMO_PASSWORD
+    }
 
     return (
         <div className="flex min-h-screen bg-gray-50">
@@ -65,9 +75,36 @@ export default function LoginPage() {
                 </div>
 
                 <div className="w-full max-w-[420px]">
-                    <div className="mb-10 lg:mb-12">
+                    <div className="mb-8 lg:mb-10">
                         <h2 className="text-3xl font-extrabold text-gray-900 mb-3 tracking-tight">Welcome back</h2>
                         <p className="text-gray-500 font-medium">Please enter your credentials to access your account.</p>
+                    </div>
+
+                    {/* Demo Credentials Banner */}
+                    <div className="mb-8 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-purple-50 p-4 shadow-sm">
+                        <div className="flex items-center gap-2 mb-3">
+                            <div className="bg-indigo-600 p-1.5 rounded-lg">
+                                <Zap className="w-3.5 h-3.5 text-white" />
+                            </div>
+                            <span className="text-xs font-bold text-indigo-700 uppercase tracking-widest">Trial Access</span>
+                        </div>
+                        <div className="space-y-1.5 mb-4">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</span>
+                                <span className="text-sm font-bold text-gray-800 font-mono bg-white px-2.5 py-1 rounded-lg border border-indigo-100">{DEMO_EMAIL}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Password</span>
+                                <span className="text-sm font-bold text-gray-800 font-mono bg-white px-2.5 py-1 rounded-lg border border-indigo-100">{DEMO_PASSWORD}</span>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={fillDemoCredentials}
+                            className="w-full text-center text-xs font-bold text-indigo-600 bg-white border border-indigo-200 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 rounded-xl py-2 transition-all duration-200 active:scale-[0.98]"
+                        >
+                            Use Demo Account →
+                        </button>
                     </div>
 
                     {state.error && (
@@ -98,6 +135,7 @@ export default function LoginPage() {
                                 Email Address
                             </label>
                             <input
+                                ref={emailRef}
                                 id="email"
                                 name="email"
                                 type="email"
@@ -117,6 +155,7 @@ export default function LoginPage() {
                                 </Link>
                             </div>
                             <input
+                                ref={passwordRef}
                                 id="password"
                                 name="password"
                                 type="password"
